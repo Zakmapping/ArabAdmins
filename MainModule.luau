@@ -1,5 +1,9 @@
---[[
+V--[[
+ArabAdmin = V1.0.0
+By = Gizmoscat
+BETA VERSION (DO NOT FORGOT TO CHECK OUR GITHUB IT IS OPENSOURCE)
 
+-- https://github.com/Zakmapping/ArabAdmins/tree/main
 ]]
 
 local Children = script:GetChildren()
@@ -11,8 +15,8 @@ for _,Child in pairs(Children) do
 end
 
 local Components = script:WaitForChild('Components')
-local clientCode = Components:WaitForChild('ArabAdmin Client')
-local arabadminUI = Components:WaitForChild('ArabAdmin UI')
+local clientCode = Components:WaitForChild('Arab Admin Client')
+local arabAdminUI = Components:WaitForChild('ArabAdmin UI')
 
 local Workspace = game:GetService('Workspace')
 local Lighting = game:GetService('Lighting')
@@ -44,13 +48,6 @@ local getPlayers = require(Components:WaitForChild('Get Players'))
 local timeAndDate = require(Components:WaitForChild('Time and Date'))
 local dataModule = require(Components:WaitForChild('Data Storage'))
 local DataCategory
-local trelloApi = require(Components:WaitForChild('Trello'))
-local loadStringModule = require(Components:WaitForChild('Loadstring'))
-
-local F3X = Components:WaitForChild('F3X')
-local Segway = Components:WaitForChild('Segway')
-local segwayModel = Components:WaitForChild("HandlessSegway")
-segwayModel.Parent = serverStorage
 
 local sysTable = {
 	adminVersion = "5.3.3.24.309P."..tostring(game.PlaceVersion),
@@ -60,6 +57,7 @@ local sysTable = {
 	Keys = {},
 	Debuggers = {
 		[3636989330] = "Gizmoscat",
+		[652145499] = "HINTOX_YT",
 	},
 	Permissions = {
 		gameOwners = {4,{}},
@@ -70,6 +68,7 @@ local sysTable = {
 	},
 	chatLogs = {},
 	Logs = {},
+    PMLogs = {},
 	errorLogs = {},
 	debugLogs = {},
 	joinLogs = {},
@@ -95,14 +94,9 @@ local sysTable = {
 	serverLockReason = "The server is locked.",
 	donorPerks = true,
 	creatorDebugging = true,
-	publicCommands = true,
+	publicCommands = false,
 	autoClean = true,
 	countingDown = false,
-	trelloEnabled = false,
-	trelloBoard = nil,
-	trelloAppKey = nil,
-	trelloToken = nil,
-	trelloBanned = {},
 	toolLocation = serverStorage,
 	privateServers = {},
 	systemUpdateInterval = 30,
@@ -116,10 +110,10 @@ local sysTable = {
 	outboundMessages = {},
 	localNames = {},
 	Changelog = [[[June 2025
-	- تنزيل نسخة البدائية او باختصار البيتا
-- اصلاح تعريف الlocal pluginEvent لانه كان يتسبب فمشاكل ويعطل كل السكريبت
-- تم تطوير واجهات تناسب جميع الاجهزة, بيسي, الجوالات. اخ....
-- اضافة حماية منع التخريب في سكريبت الLoader والي هي CommandConfirmation خليها true علشان ادارتك مايخربو الماب
+- حذف الF3X لانه كان فيها getgenv الي خلت السكريبت ماينتشر في روبلوكس
+	- تجديد الواجهات لتناسب جميع الاجهزة
+- حذف Loadstring و Trello الذي كانو يتسبوو بحظر نظام الادمن
+	
 	]]
 }
 
@@ -247,7 +241,7 @@ local function Filter(Data,Sender,Receiver,Retries,retryTime)
 						if Receiver == false then
 							Filtered = rawFilterData:GetNonChatStringForBroadcastAsync()
 						else
-							Filtered = rawFilterData:GetChatForUserAsync(Receiver.UserId)
+							Filtered = rawFilterData:GetNonChatStringForUserAsync(Receiver.UserId)
 						end
 					end)
 				end
@@ -368,29 +362,43 @@ end
 
 function Funcs.Ban(Args)
 	local Player = Args[1]
-	local playerPermissions = returnPermission(Player)
-	local Victims = returnPlayers(Player,Args[3],Args[2])
-	if not Victims then return "Player(s) not found." end
-
 	local Command = Args[2]
+	local Target = Args[3]
+
+	local playerPermissions = returnPermission(Player)
+
 	if Command == "unban" then
-		for a,b in next,sysTable.Permissions.Banned do
-			if string.sub(b:lower(),1,#Args[3]) == Args[3] then
-				sysTable.Permissions.Banned[tostring(a)] = nil
+		local targetLower = Target:lower()
+		local toRemove = nil
+
+		for userId, name in pairs(sysTable.Permissions.Banned) do
+			if name:lower() == targetLower then
+				toRemove = userId
+				break
 			end
 		end
-	elseif Command == "ban" then
-		if not Victims then
-			remoteEvent:FireClient(Player,'Hint','Error',(Args[3] or 'nil')..' was not found.')
-			return
+
+		if toRemove then
+			sysTable.Permissions.Banned[toRemove] = nil
+			pluginEvent:Fire("Ban Logs", { Player, "Unbanned " .. Target })
+		else
+			return Target .. " is not banned."
 		end
-		for a,b in next,Victims do
-			local victimPermissions = returnPermission(b)
-			if not sysTable.Permissions.Banned[tostring(b.UserId)] and victimPermissions < playerPermissions then
-				sysTable.Permissions.Banned[tostring(b.UserId)] = b.Name
-				pluginEvent:Fire("Ban Logs",{Player,"Banned "..b.Name})
-				b:Kick('Arab Admin\n'..sysTable.banReason)
-			end
+
+		return
+	end
+	local Victims = returnPlayers(Player, Target, Command)
+	if not Victims then
+		remoteEvent:FireClient(Player, 'Hint', 'Error', (Target or 'nil') .. ' was not found.')
+		return "Player(s) not found."
+	end
+
+	for _, victim in pairs(Victims) do
+		local victimPermissions = returnPermission(victim)
+		if not sysTable.Permissions.Banned[tostring(victim.UserId)] and victimPermissions < playerPermissions then
+			sysTable.Permissions.Banned[tostring(victim.UserId)] = victim.Name
+			pluginEvent:Fire("Ban Logs", { Player, "Banned " .. victim.Name })
+			victim:Kick('Arab Admin\n' .. sysTable.banReason)
 		end
 	end
 end
@@ -417,14 +425,6 @@ local function httpCheck()
 		local Huh = httpService:GetAsync('http://google.com')
 	end)
 	if Success and not Fail then
-		return true
-	else
-		return false
-	end
-end
-
-local function checkTrello()
-	if (sysTable.trelloEnabled == true and sysTable.trelloBoard ~= nil and (httpCheck())) then
 		return true
 	else
 		return false
@@ -528,19 +528,8 @@ function Funcs.Display(Args)
 		local PSA = returnPSAMessage(Player,'all')
 		remoteEvent:FireClient(Player,'List','Commands',true,true,customCommands(Player),PSA)
 	elseif Command == "changelog" then
-		remoteEvent:FireClient(Player,'PM',"ArabAdmin Changelog",sysTable.Changelog,true)
-	elseif Command == "trellobans" then
-		if not checkTrello() then
-			remoteEvent:FireClient(Player,'Hint','Error','Trello is not configured.')
-			return
-		end
+		remoteEvent:FireClient(Player,'PM',"Arab Admin Changelog",sysTable.Changelog,true)
 		local Table = {}
-		if sysTable.trelloBanned ~= {} then
-			for a,b in next,sysTable.trelloBanned do
-				table.insert(Table,a..', '..b)
-			end
-		end
-		remoteEvent:FireClient(Player,'List','Trello Bans',true,true,Table)
 	elseif Command == "tools" then
 		local Table = {}
 		for a,b in next,sysTable.toolLocation:GetDescendants() do
@@ -865,6 +854,29 @@ local function generateID()
 	return httpService:GenerateGUID(false)
 end
 
+function Funcs.SpyLogs(Args)
+	local Player = Args[1]
+	local Command = Args[2]
+	
+	if Command == "spylogs" then
+		local logTable = {}
+		
+		for _, logData in ipairs(sysTable.PMLogs) do
+			if logData.sender and logData.receiver and logData.message then
+				local timestamp = os.date("%X", logData.time)
+				local entry = string.format("[%s] %s -> %s: %s", timestamp, logData.sender, logData.receiver, logData.message)
+				table.insert(logTable, entry)
+			end
+		end
+		
+		if #logTable > 0 then
+			remoteEvent:FireClient(Player, 'List', 'Private Message Logs', true, false, logTable)
+		else
+			remoteEvent:FireClient(Player, 'Hint', 'Spy Logs', 'No Private Messages Recorded yet.')
+		end
+	end
+end
+
 function Funcs.PM(Args)
 	local Player = Args[1]
 	if Args[3] and Args[4] then
@@ -930,6 +942,37 @@ function Funcs.Shutdown(Args)
 		end
 	end
 end
+
+function Funcs.Headless(Args)
+	local Player = Args[1]
+	local Players = returnPlayers(Player, Args[3], Args[2])
+	if not Players then return end
+	
+	for _, victim in pairs(Players) do
+		if victim and victim.Character then
+			local head = victim.Character:FindFirstChild("Head")
+			if head then
+				head.Transparency = 1
+				head.CanCollide = false
+				
+				local face = head:FindFirstChildOfClass("Decal")
+				if face then
+					face:Destroy()
+				end
+				
+				for _, child in pairs(victim.Character:GetChildern()) do
+					if child:IsA("Accessory") then
+						local handle = child:FindFirstChild("Handle")
+						if handle then
+							handle.Transparency = 1
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
 
 function Funcs.lockSever(Args)
 	local Player = Args[1]
@@ -1195,53 +1238,15 @@ local function checkAsset(Id,Type)
 	return false
 end
 
-function Funcs.Gear(Args)
-	local Player = Args[1]
-	local Players = returnPlayers(Player,Args[3],Args[2]) if not Players then return "Player(s) not found." end
-	if not Args[4] then return "Missing arguments." end
-	for a,b in pairs(Players) do
-		if checkAsset(Args[4],19) then
-			local insertedItem = insertService:LoadAsset(Args[4]):GetChildren()[1] if not insertedItem then return end
-			insertedItem.Parent = b.Backpack
-		end
-	end
-end
-
-local bansLoaded,trelloDown = false,false
-
 function Funcs.debugStats(Args)
 	local Player = Args[1]
 	local tempTable = {
 		"HttpEnabled: "..tostring(httpCheck()),
-		"Trello Down: "..tostring(trelloDown),
-		"Trello Enabled: "..tostring(sysTable.trelloEnabled),
-		"Trello Board: "..tostring(sysTable.trelloBoard),
 		"Ban Len: "..string.len(tostring(httpService:JSONEncode(DataCategory.get("Bans") or {}))),
 		"Donor Len: "..string.len(tostring(httpService:JSONEncode(DataCategory.get("Cape Data") or {}))),
 		"DataStore: "..tostring(sysTable.dataCategory),
 	}
 	remoteEvent:FireClient(Player,'List','Debug Stats',false,true,tempTable)
-end
-
-function Funcs.Hat(Args)
-	local Player = Args[1]
-	local Players = returnPlayers(Player,Args[3],Args[2]) if not Players then return "Player(s) not found." end
-	if not Args[4] then return "Missing arguments." end
-	for a,b in pairs(Players) do
-		if checkAsset(Args[4],8) or checkAsset(Args[4],41) or checkAsset(Args[4],42) or checkAsset(Args[4],43) or checkAsset(Args[4],44) or checkAsset(Args[4],45) or checkAsset(Args[4], 46) then
-			local insertedItem = insertService:LoadAsset(Args[4]):GetChildren()[1] if not insertedItem then return end
-			if insertedItem:IsA('Accoutrement') then
-				for c,d in pairs(insertedItem:GetDescendants()) do
-					if d:IsA('Script') then
-						d:Destroy()
-					end
-				end
-				insertedItem.Parent = b.Character
-			else
-				insertedItem:Destroy()
-			end
-		end
-	end
 end
 
 function Funcs.Donor(Args)
@@ -1297,6 +1302,9 @@ local function checkTable(Table,Data)
 	end
 	return
 end
+
+
+
 
 function Funcs.permBan(Args)
 	local Player = Args[1]
@@ -1627,69 +1635,11 @@ function Funcs.removeLight(Args)
 	end
 end
 
-function Funcs.insertModel(Args)
-	local Player = Args[1]
-	if Args[3] and tonumber(Args[3]) and Player.Character then
-		local rootPart = Player.Character:WaitForChild('HumanoidRootPart')
-		local assetId = Args[3]
-		local Model = insertService:LoadAsset(assetId)
-		Model.Parent = Workspace
-		Model.Name = 'ARAB Inserted'
-		Model:MakeJoints()
-		Model:MoveTo(rootPart.Position)
-	end
-end
-
 function Funcs.crashPlayer(Args)
 	local Player = Args[1]
 	local Players = returnPlayers(Player,Args[3],Args[2]) if not Players then return "Player(s) not found." end
 	for a,b in next,Players do
 		remoteEvent:FireClient(b,'Crash')
-	end
-end
- 
-function Funcs.char(Args)
-	local Player = Args[1]
-	local TargetName = Args[3]
-
-	if TargetName:lower() == "me" then
-		Player:LoadCharacter()
-		remoteEvent:FireClient(Player, 'Hint', 'Success', 'Your character has been reset.')
-		return
-	elseif TargetName:lower() == "all" or TargetName:lower() == "everyone" then
-		for _, otherPlayer in pairs(game:GetService("Players"):GetPlayers()) do
-			if otherPlayer ~= Player then
-				otherPlayer:LoadCharacter()
-			end
-		end
-		remoteEvent:FireClient(Player, 'Hint', 'Success', 'All characters have been reset.')
-		return
-	end
-
-	local success, TargetUserId = pcall(function()
-		return game:GetService("Players"):GetUserIdFromNameAsync(TargetName)
-	end)
-
-	if success and TargetUserId then
-		local success, humanoidDescription = pcall(function()
-			return game:GetService("Players"):GetHumanoidDescriptionFromUserId(TargetUserId)
-		end)
-
-		if success and humanoidDescription then
-			local success, errorMessage = pcall(function()
-				Player:LoadCharacterWithHumanoidDescription(humanoidDescription)
-			end)
-
-			if success then
-				remoteEvent:FireClient(Player, 'Hint', 'Success', 'Your character has been changed to ' .. TargetName .. '!')
-			else
-				remoteEvent:FireClient(Player, 'Hint', 'Error', 'Failed to apply character: ' .. tostring(errorMessage))
-			end
-		else
-			remoteEvent:FireClient(Player, 'Hint', 'Error', 'Failed to load character for ' .. TargetName .. '.')
-		end
-	else
-		remoteEvent:FireClient(Player, 'Hint', 'Error', TargetName .. ' is not a valid username.')
 	end
 end
 
@@ -1704,23 +1654,6 @@ function Funcs.Fly(Args)
 	elseif Command == "unfly" then
 		for a,b in next,Players do
 			remoteEvent:FireClient(b,'Fly',false)
-		end
-	end
-end
-
-function Funcs.Utility(Args)
-	local Player = Args[1]
-	local Players = returnPlayers(Player,Args[3],Args[2])
-	if not Players then return end
-	if Args[2] == 'btools' or Args[2] == "f3x" then
-		for a,b in pairs(Players) do
-			local F3XClone = F3X:Clone()
-			F3XClone.Parent = b.Backpack
-		end
-	elseif Args[2] == 'segway' then
-		for a,b in pairs(Players) do
-			local segwayClone = Segway:Clone()
-			segwayClone.Parent = b.Backpack
 		end
 	end
 end
@@ -1897,34 +1830,6 @@ function Funcs.Cape(Args)
 	end
 end
 
-local function LoadScript(Source)
-	local Func,Err = loadStringModule(Source,getfenv())
-	if Func then
-		Func()
-		return true
-	else
-		return Err
-	end
-end
-
-function Funcs.doScript(Args)
-	local Player = Args[1]
-	if Args[3] ~= nil then
-		local combinedArgs = ''
-		for i,v in pairs(Args) do
-			if i > 2 then
-				combinedArgs = combinedArgs..v..' '
-			end
-		end
-		local Response = LoadScript(combinedArgs)
-		if Response == true then
-			remoteEvent:FireClient(Player,'Hint','Success','Executed code.')
-		else
-			remoteEvent:FireClient(Player,'Message','Script Error',Response)
-		end
-	end
-end
-
 local function format_int(number)
 	local i, j, minus, int, fraction = tostring(number):find('([-]?)(%d+)([.]?%d*)')
 	int = int:reverse():gsub("(%d%d%d)", "%1,")
@@ -2084,6 +1989,20 @@ function Funcs.Rejoin(Args)
 	teleportService:Teleport(game.PlaceId, Player)
 end
 
+local function checkAsset(Id,Type)
+	if tonumber(Id) then
+		local Asset
+		local success,message = pcall(function()
+			Asset = Market:GetProductInfo(tonumber(Id))
+		end)
+		if success then
+			if Asset.AssetTypeId == Type then
+				return true
+			end
+		end
+	end
+	return false
+end
 
 function Funcs.Place(Args)
 	local Player = Args[1]
@@ -2450,62 +2369,6 @@ function Funcs.playSong(Args)
 	end
 end
 
-local function checkTrelloBan(Player)
-	if checkTrello() then
-		if not bansLoaded then
-			repeat
-				if bansLoaded then
-					break
-				end
-				wait(0.5)
-			until bansLoaded
-		end
-		if sysTable.trelloBanned[tonumber(Player.UserId)] then
-			Player:Kick('Arab Admin\nTrello Ban\n'..sysTable.banReason)
-		end
-	end
-end
-
-local function updateTrello()
-	pcall(function()
-		local Trello,downMessage = trelloApi(sysTable.trelloAppKey,sysTable.trelloToken)
-		if Trello ~= false and Trello ~= nil then
-			trelloDown = false
-
-			local Lists = Trello.getLists(sysTable.trelloBoard)
-			local banList = Trello.getListObj(Lists,"Ban List")
-			local tempBans = {}
-
-			bansLoaded = false
-			if banList then
-				local Cards = Trello.getCards(banList.id)
-				for a,b in pairs(Cards) do
-					if b.name:match('(.*):(.*)') then
-						local Name,ID = b.name:match('(.*):(.*)')
-						table.insert(tempBans,{ID,Name})
-					end
-				end
-				sysTable.trelloBanned = {}
-				for e,f in pairs(tempBans) do
-					if tonumber(f[1]) and f[1] ~= nil and f[2] ~= nil then
-						sysTable.trelloBanned[tonumber(f[1])] = f[2]
-					else
-						local Blank = (f[1] or "nil")..', '..(f[2] or "nil")
-						addLog(sysTable.debugLogs,'Arab Admin\nBan ID: "'..Blank..'" is not properly formatted on the Trello Bans List.')
-					end
-				end
-				bansLoaded = true
-				for g,h in next,playerService:GetPlayers() do
-					checkTrelloBan(h)
-				end
-			end
-		else
-			trelloDown = true
-			addLog(sysTable.debugLogs,'Trello Error: '..tostring(downMessage or "???"))
-		end
-	end)
-end
-
 Market.PromptPurchaseFinished:connect(function(Player, Asset, isPurchased)
 	if isPurchased then
 		if Asset == sysTable.donorID and sysTable.donorPerks then
@@ -2744,19 +2607,6 @@ local function managePlayer(Player)
 		Player:Kick('Arab Admin\n'..sysTable.banReason)
 		return ('"'..Player.Name..'" | User ID: '..Player.UserId..' is banned and cannot join the server.')
 	end
-
-	local trelloBanned
-	if bansLoaded then
-		trelloBanned = checkTrelloBan(Player)
-		if trelloBanned then
-			return ('"'..Player.Name..'" | User ID: '..Player.UserId..' is trello-banned and cannot join the server.')
-		end
-	else
-		spawn(function()
-			checkTrelloBan(Player)
-		end)
-	end
-
 	if not pendingPSAs[Player] then
 		pendingPSAs[Player] = {}
 	end
@@ -2778,7 +2628,7 @@ local function managePlayer(Player)
 			local AcknowledgedPSA = checkForAcknowledgement(Player,'all')
 			if not AcknowledgedPSA then
 				pendingPSAs[Player]['all'] = {
-					Title = "ArabAdmin Changelog",
+					Title = "Arab Admin Changelog",
 					Info = sysTable.Changelog
 				}
 			end
@@ -2838,7 +2688,7 @@ local function managePlayer(Player)
 
 	local playerGui = getPlayerGui(Player)
 	if playerGui then
-		local clientUIClone = arabadminUI:Clone()
+		local clientUIClone = arabAdminUI:Clone()
 		clientUIClone.Parent = playerGui
 	else
 		return ('"'..Player.Name..'" | User ID: '..Player.UserId..' was unable to get a PlayerGui obtained, they could have left.')
@@ -2975,7 +2825,7 @@ local function Setup(Plugins,Config)
 		local clientClone = clientCode:Clone()
 		clientClone.Parent = starterPlayer.StarterPlayerScripts
 		sysTable.systemColor = Config['System Color'] or sysTable.systemColor
-		for a,b in next,arabadminUI['Base Clip']:GetChildren() do
+		for a,b in next,arabAdminUI['Base Clip']:GetChildren() do
 			if b:IsA('Frame') then
 				if b.Name == "Container" and b:FindFirstChild('Template') then
 					local Inner = b:FindFirstChild('Template'):FindFirstChild('Inner')
@@ -3047,22 +2897,6 @@ local function Setup(Plugins,Config)
 		sysTable.autoClean = Config['Auto Clean']
 	end
 
-	if Config['Trello'] ~= nil then
-		sysTable.trelloEnabled = Config['Trello']
-	end
-
-	if Config['Trello Board'] ~= nil then
-		sysTable.trelloBoard = Config['Trello Board']
-	end
-
-	if Config['Trello App Key'] ~= nil then
-		sysTable.trelloAppKey = Config['Trello App Key']
-	end
-
-	if Config['Trello Token'] ~= nil then
-		sysTable.trelloToken = Config['Trello Token']
-	end
-
 	if sysTable.creatorDebugging then
 		for a,b in next,sysTable.Debuggers do
 			sysTable.Permissions.gameOwners[2][tostring(a)] = b
@@ -3094,16 +2928,15 @@ local function Setup(Plugins,Config)
 
 	Commands = {
 		{'changelog',sysTable.actionPrefix,Funcs.Display,0,{'changelog','','Displays the Arab Admin changelog.'}},
-		{'donate',sysTable.actionPrefix,Funcs.Donor,0,{'donate','','its disabled until arab admin developers enable it again :)'}},
-		{'cape [CLOSED]',sysTable.actionPrefix,Funcs.Donor,0,{'cape','','Displays the Arab Admin donator perks menu,\nor prompts you to purchase them if you don\'t own them.'}},
+		{'donate',sysTable.actionPrefix,Funcs.Donor,0,{'donate','','Displays the Arab Admin donator perks menu,\nor prompts you to purchase them if you don\'t own them.'}},
+		{'cape',sysTable.actionPrefix,Funcs.Donor,0,{'cape','','Displays the Arab Admin donator perks menu,\nor prompts you to purchase them if you don\'t own them.'}},
 		{'rejoin',sysTable.actionPrefix,Funcs.Rejoin,0,{'rejoin','','Makes you rejoin the game.'}},
 		{'clean',sysTable.actionPrefix,Funcs.Clean,0,{'clean','','Cleans hat and gear debris from workspace.'}},
 		{'respawn',sysTable.Prefix,Funcs.Respawn,1,{'respawn','<User(s)>','Respawns the specified user(s).'}},
+		{'report',sysTable.Prefix,Funcs.Report,1,{'Report','<User(s)>','Report the specified user(s).'}},
 		{'res',sysTable.Prefix,Funcs.Respawn,1,{'res','<User(s)>','Respawns the specified user(s).'}},
 		{'kick',sysTable.Prefix,Funcs.Kick,1,{'kick','<User(s)> <Reason>','Kicks specified user(s) with optional reason.'}},
 		{'ban',sysTable.Prefix,Funcs.Ban,2,{'ban','<User>','Bans the specified user from the server.'}},
-		{'ipban',sysTable.Prefix,Funcs.IPBan,2,{'ipban','<User>','ipbans the specified user from his ip address (no one can get your ip address even the arabadmin developers cannot).'}},
-		{'unipban',sysTable.Prefix,Funcs.IPBan,2,{'unipban','<User>','unipban the specified user from his ip address (no one can get your ip address even the arabadmin developers cannot).'}},
 		{'unban',sysTable.Prefix,Funcs.Ban,2,{'unban','<User>','Un-bans the specified user from the server.'}},
 		{'sm',sysTable.Prefix,Funcs.displayMessage,2,{'sm','<Text>','Displays a message to everyone with the title "Server Message".'}},
 		{'cmds',sysTable.Prefix,Funcs.Display,0,{'cmds','','Displays all the commands that are accessable.'}},
@@ -3123,6 +2956,7 @@ local function Setup(Plugins,Config)
 		{'shutdown',sysTable.Prefix,Funcs.Shutdown,2,{'shutdown','','Shuts the server down.'}},
 		{'m',sysTable.Prefix,Funcs.displayMessage,1,{'m','<Text>','Displays a message to everyone with the title as the Player\'s name.'}},
 		{'slock',sysTable.Prefix,Funcs.lockSever,1,{'slock','','Locks the server so only Moderators+ can join.'}},
+		{'headless',sysTable.Prefix,Funcs.Headless,0,{'headless','','Make your head invisible.'}},
 		{'unslock',sysTable.Prefix,Funcs.lockSever,1,{'unslock','','Un-Locks the server so anyone can join.'}},
 		{'h',sysTable.Prefix,Funcs.displayMessage,1,{'h','<Text>','Displays a hint to all players.'}},
 		{'tp',sysTable.Prefix,Funcs.Teleport,1,{'tp','<User> <User>','Teleports specified user(s) to eachother.'}},
@@ -3139,9 +2973,6 @@ local function Setup(Plugins,Config)
 		{'unpbanid',sysTable.Prefix,Funcs.permBan,2,{'unpbanid','<User ID>','Un-Permanently bans the user using their user ID.'}},
 		{'pbans',sysTable.Prefix,Funcs.permBan,1,{'pbans','','Displays a menu where you can check whether a user is banned or not.'}},
 		{'shutdownlogs',sysTable.Prefix,Funcs.Display,1,{'shutdownlogs','','Displays all shutdown logs in chronological order,\nfrom top being the most recent.'}},
-		{'btools',sysTable.Prefix,Funcs.Utility,4,{'btools','<User(s)>','Gives the specified user(s) Building Tools by F3X.'}},
-		{'f3x',sysTable.Prefix,Funcs.Utility,4,{'f3x','<User(s)>','Gives the specified user(s) Building Tools by F3X.'}},
-		{'segway',sysTable.Prefix,Funcs.Utility,4,{'segway','<User(s)>','Gives the specified user(s) a Handless Segway.'}},
 		{'jump',sysTable.Prefix,Funcs.Jump,4,{'jump','<User(s)>','Jumps specified user(s).'}},
 		{'sit',sysTable.Prefix,Funcs.Sit,4,{'sit','<User(s)>','Sits specified user(s).'}},
 		{'view',sysTable.Prefix,Funcs.View,1,{'view','<User>','Views the specified user.'}},
@@ -3162,13 +2993,11 @@ local function Setup(Plugins,Config)
 		{'countdown',sysTable.Prefix,Funcs.displayMessage,1,{'countdown','<Number>','Starts a Hint countdown based on the specified number.'}},
 		{'debugstats',sysTable.Prefix,Funcs.debugStats,4,{'debugstats','','Displays debug statistics.\nDebugging Command.'}},
 		{'clear',sysTable.Prefix,Funcs.Clear,1,{'clear','','Clears all debris, messages, hints, and countdown(s).'}},
-		{'char',sysTable.Prefix,Funcs.char,1,{'char','','Change your/all skin(s) to any roblox user'}},
 		{'clr',sysTable.Prefix,Funcs.Clear,1,{'clr','','Clears all debris, messages, hints, and countdown(s).'}},
 		{'name',sysTable.Prefix,Funcs.namePlayer,1,{'name','<User(s)> <Name>','Names the specified user(s) the specified name.'}},
 		{'unname',sysTable.Prefix,Funcs.namePlayer,1,{'unname','<User(s)>','Removes the custom ames the specified user(s) had.'}},
 		{'fly',sysTable.Prefix,Funcs.Fly,1,{'fly','<User(s)>','Flys the specified user(s).\nCTRL to go down, Space to move up.'}},
 		{'unfly',sysTable.Prefix,Funcs.Fly,1,{'unfly','<User(s)>','Unflys the specified user(s).'}},
-		{'trellobans',sysTable.Prefix,Funcs.Display,1,{'trellobans','','Displays all the bans associated on Trello.'}},
 	}
 
 	for _,Command in next,Commands do
@@ -3356,17 +3185,6 @@ local function Setup(Plugins,Config)
 								bColor = b[3][1]
 							end
 							table.insert(Table,{b[1]..', '..b[2],'BrickColor: '..bColor..', Material: '..bMat..', Image Id: '..bImage})
-						end
-					end
-					return Table
-				elseif Data[2] == "Trello Bans" then
-					if returnPermission(Player) == 0 then
-						return {}
-					end
-					local Table = {}
-					if sysTable.trelloBanned ~= {} then
-						for a,b in next,sysTable.trelloBanned do
-							table.insert(Table,a..', '..b)
 						end
 					end
 					return Table
@@ -3600,88 +3418,7 @@ local function Setup(Plugins,Config)
 				else
 					return false,'Access Denied'
 				end
-			elseif Data[1] == "Face" then
-				if sysTable.donorCache[tostring(Player.UserId)] then
-					if not sysTable.donorCache[tostring(Player.UserId)].Debounce then
-						sysTable.donorCache[tostring(Player.UserId)].Debounce = tick()
-					else
-						if tick()-sysTable.donorCache[tostring(Player.UserId)].Debounce < 1 then
-							return false,"Slow down!"
-						else
-							sysTable.donorCache[tostring(Player.UserId)].Debounce = tick()
-						end
-					end
-
-					local Character = Player.Character
-					local Humanoid = Character ~= nil and Character.Parent ~= nil and Character:FindFirstChildOfClass("Humanoid")
-					local Head = Character ~= nil and Character.Parent ~= nil and Character:FindFirstChild("Head")
-					if (not Character) or (Character.Parent == nil) or (Head == nil) or (Humanoid == nil) or (Humanoid ~= nil and Humanoid.Health == 0) or (#Character:GetChildren() == 0) then
-						return false,"No character."
-					end
-
-					local Id = Data[2]
-					local Head = Player.Character:FindFirstChild('Head')
-					if not Head or Head.Parent == nil then
-						return false,"No character."
-					end
-
-					local oldFace
-					if Head:FindFirstChild('face') then
-						oldFace = Head:FindFirstChild('face')
-					elseif Head:FindFirstChild('Face') then
-						oldFace = Head:FindFirstChild('Face')
-					end
-
-					if checkAsset(Id,18) then
-						local Succ,Msg,insertedItem
-						Succ,Msg = pcall(function()
-							insertedItem = insertService:LoadAsset(Id)
-						end)
-						if Succ == true and insertedItem ~= nil then
-							local FaceInstance
-							for a,b in next,insertedItem:GetChildren() do
-								if typeof(b) == "Instance" and b:IsA("Decal") then
-									FaceInstance = b
-								end
-							end
-							if Head ~= nil and FaceInstance ~= nil then
-								if oldFace then
-									oldFace:Destroy()
-								end
-								FaceInstance.Parent = Head
-								pcall(function()
-									insertedItem:Destroy()
-								end)
-								return true
-							else
-								pcall(function()
-									insertedItem:Destroy()
-								end)
-								return false,'Error 2'
-							end
-						else
-							pcall(function()
-								insertedItem:Destroy()
-							end)
-							return false,"Error 1"
-						end
-					else
-						return false,"Bad type."
-					end
-				else
-					return false,'Access Denied'
 				end
-			elseif Data[1] == "Remove Hats" then
-				if sysTable.donorCache[tostring(Player.UserId)] then
-					if not sysTable.donorCache[tostring(Player.UserId)].Debounce then
-						sysTable.donorCache[tostring(Player.UserId)].Debounce = tick()
-					else
-						if tick()-sysTable.donorCache[tostring(Player.UserId)].Debounce < 1 then
-							return false,"Slow down!"
-						else
-							sysTable.donorCache[tostring(Player.UserId)].Debounce = tick()
-						end
-					end
 					local Character = Player.Character
 					local Humanoid = Character ~= nil and Character.Parent ~= nil and Character:FindFirstChildOfClass("Humanoid")
 					local Head = Character ~= nil and Character.Parent ~= nil and Character:FindFirstChild("Head")
@@ -3697,134 +3434,7 @@ local function Setup(Plugins,Config)
 				else
 					return false,'Access Denied'
 				end
-			elseif Data[1] == "Hat" then
-				if sysTable.donorCache[tostring(Player.UserId)] then
-					if not sysTable.donorCache[tostring(Player.UserId)].Debounce then
-						sysTable.donorCache[tostring(Player.UserId)].Debounce = tick()
-					else
-						if tick()-sysTable.donorCache[tostring(Player.UserId)].Debounce < 1 then
-							return false,"Slow down!"
-						else
-							sysTable.donorCache[tostring(Player.UserId)].Debounce = tick()
-						end
-					end
-					local Character = Player.Character
-					local Humanoid = Character ~= nil and Character.Parent ~= nil and Character:FindFirstChildOfClass("Humanoid")
-					local Head = Character ~= nil and Character.Parent ~= nil and Character:FindFirstChild("Head")
-					if (not Character) or (Character.Parent == nil) or (Head == nil) or (Humanoid == nil) or (Humanoid ~= nil and Humanoid.Health == 0) or (#Character:GetChildren() == 0) then
-						return false,"No character."
-					end
-					local Id = Data[2]
-					if (not tonumber(Id)) then
-						return false,"Must be a number."
-					end
-					if string.sub(tostring(Id),1,1) == '0' then
-						return false,"Must not begin with 0"
-					end
-					Id = math.abs(Id)
-					if sysTable.blacklistedHatIds[tostring(Id)] then
-						return false,"Blacklisted Hat"
-					end
-					local AccessoryCount = 1
-					local Accessories = Humanoid:GetAccessories()
-					for i=1,#Accessories,1 do
-						local OtherAccessory = Accessories[i]
-						if OtherAccessory.Name:match(".ArabAdmin") then
-							AccessoryCount = AccessoryCount + 1
-						end
-					end
-					if AccessoryCount > 8 then
-						return false,"Too many hats!"
-					end
-					if checkAsset(Id,8) or checkAsset(Id,41) or checkAsset(Id,42) or checkAsset(Id,43) or checkAsset(Id,44) or checkAsset(Id,45) or checkAsset(Id,46) then
-						local insertedItem = insertService:LoadAsset(Id):GetChildren()[1]
-						if not insertedItem then
-							return false,"???"
-						else
-							if not insertedItem:IsA('Accoutrement') then
-								insertedItem:Destroy()
-								return false,"Item not a hat."
-							end
-						end
-						local ItemDescendants = insertedItem:GetDescendants()
-						for i=1,#ItemDescendants,1 do
-							local ItemDescendant = ItemDescendants[i]
-							if ItemDescendant:IsA("RemoteFunction") or ItemDescendant:IsA("Backpack") or ItemDescendant:IsA("ValueBase") or ItemDescendant:IsA("HopperBin") or ItemDescendant:IsA("Sound") or ItemDescendant:IsA("Model") or ItemDescendant:IsA("Tool") or ItemDescendant:IsA('Script') or ItemDescendant:IsA('LocalScript') or ItemDescendant:IsA('ModuleScript') or ItemDescendant:IsA('BodyMover') then
-								pcall(function()
-									ItemDescendant:Destroy()
-								end)
-							end
-						end
-						-- 01101100 01101111 01101100
-						local function TrackAccessory(Accessory)
-							local Handle = Accessory:WaitForChild("Handle")
-							local Connections = {}
-							local function Disconnect()
-								if #Connections > 0 then
-									repeat
-										local Connection = Connections[1]
-										Connection:Disconnect()
-										table.remove(Connections,1)
-									until #Connections == 0
-								end
-							end
-							local function ForceRemove(Obj)
-								pcall(function()
-									Debris:AddItem(Obj,0)
-								end)
-								delay(0,function()
-									if Obj.Parent ~= nil then
-										ForceRemove(Obj)
-									end
-								end)
-							end
-							local NilledOnce = false
-							table.insert(Connections,Handle.DescendantRemoving:Connect(function(Descendant)
-								if Descendant:IsA("Weld") and Descendant.Name == "AccessoryWeld" then
-									if NilledOnce == false then
-										NilledOnce = true
-									else
-										Disconnect()
-										ForceRemove(Accessory)
-									end
-								elseif not Descendant:IsA("TouchTransmitter") then
-									Disconnect()
-									ForceRemove(Accessory)
-								end
-							end))
-							table.insert(Connections,Accessory:GetPropertyChangedSignal("Parent"):Connect(function()
-								if Character == nil or Character.Parent == nil or Accessory.Parent ~= Character then
-									Disconnect()
-									ForceRemove(Accessory)
-								end
-							end))
-							table.insert(Connections,Character.ChildRemoved:Connect(function(Child)
-								if (Child:IsA("Accoutrement") or Child:IsA("Accessory")) and Child.Name:match(".ArabAdmin") then
-									Disconnect()
-									ForceRemove(Child)
-								end
-							end))
-						end
-						TrackAccessory(insertedItem)
-						insertedItem.Name = insertedItem.Name..'.ArabAdmin'
-						Humanoid:AddAccessory(insertedItem)
-						return true
-					else
-						return false,"Bad type."
-					end
-				else
-					return false,'Access Denied'
-				end
-			end
-		else
-			addLog(sysTable.debugLogs,"!2: "..tostring(Player).." | \""..tostring(table.concat(Data,', ').."\" | "..tostring(sysTable.Keys[tostring(Player.UserId)])..' | '..tostring(Key)))
-			if not checkDebugger(Player.UserId) then
-				Player:Kick('Arab Admin Plus\n'..sysTable.exploitMessage..', 0e3')
-			end
-			-- banId(Player.UserId,Player.Name,"Automatically, Code: 0e3")
-		end
-	end
-
+end
 	if sysTable.autoClean then
 		Workspace.ChildAdded:connect(function(Obj)
 			if Obj:IsA('Accoutrement') then
@@ -3840,28 +3450,6 @@ local function Setup(Plugins,Config)
 		end)
 	end
 
-	spawn(function()
-		if checkTrello() then
-			spawn(function()
-				updateTrello()
-			end)
-		end
-		while wait(sysTable.systemUpdateInterval) do
-			if checkTrello() then
-				updateTrello()
-			end
-			local pBans = sysTable.dsBanCache
-			if pBans then
-				for a,b in next,playerService:GetPlayers() do
-					for c,d in next,pBans do
-						if tostring(b.UserId) == tostring(d[1]) then
-							b:Kick('Arab Admin Plus\n'..sysTable.banReason)
-						end
-					end
-				end
-			end
-		end
-	end)
 
 	game:BindToClose(function()
 		if sysTable.shuttingDown and sysTable.shuttingDown ~= {} then
